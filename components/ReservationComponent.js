@@ -1,8 +1,11 @@
 import React, { Component } from 'react';
-import { Text, View, ScrollView, StyleSheet, Picker, Switch, Button, TouchableOpacity,Modal} from 'react-native';
+import { Text, View, ScrollView, StyleSheet, Picker, Switch, Button, TouchableOpacity,Modal,Alert} from 'react-native';
 import { Card, Icon } from 'react-native-elements';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Moment from 'moment';
+import * as Animatable from 'react-native-animatable';
+import * as Permissions from 'expo-permissions';
+import * as Notifications from 'expo-notifications';
 
 class Reservation extends Component {
 
@@ -26,23 +29,55 @@ class Reservation extends Component {
         this.setState({showModal: !this.state.showModal })
     }
 
-    handleReservation() {
-        console.log(JSON.stringify(this.state));
-        this.toggleModal();
-    }
+    // handleReservation() {
+    //     console.log(JSON.stringify(this.state));
+    //     this.toggleModal();
+    // }
 
     resetForm() {
         this.setState({
             guests: 1,
             smoking: false,
-            date: '',
+            date: new Date(),
+            show: false,
+            mode: 'date',
             showModal: false
         });
     }
 
+    async obtainNotificationPermission() {
+        let permission = await Permissions.getAsync(Permissions.USER_FACING_NOTIFICATIONS)
+        if (permission.status !== 'granted') {
+            permission = await Permissions.askAsync(Permissions.USER_FACING_NOTIFICATIONS)
+            if (permission.status !== 'granted') {
+                Alert.alert('Permission not granted to show notifications')
+            }
+        }
+        return permission;
+    }
+
+    async presentLocalNotification(date) {
+        await this.obtainNotificationPermission();
+        Notifications.presentLocalNotificationAsync({
+            title: 'Your Reservation',
+            body: 'Reservation for ' + date + 'requested',
+            ios: {
+                sound: true
+            },
+            android: {
+                sound: true,
+                vibrate: true,
+                color: '#512DA8'
+            } 
+        });
+        
+    }
+
+
     render() {
         return(
             <ScrollView>
+                <Animatable.View animation="zoomInUp" duration={2000} delay={500}>
                 <View style={styles.formRow}>
                     <Text style={styles.formLabel}>Number of Guests</Text>
                     <Picker 
@@ -110,10 +145,30 @@ class Reservation extends Component {
                     <Button 
                         title='Reserve'
                         color='#512DA8'
-                        onPress={() => this.handleReservation()}
+                        onPress={() => {
+                            Alert.alert(
+                                'Your Reservation OK?',
+                                'Number of Guests: ' + this.state.guests + '\n Smoking? ' + this.state.smoking + '\n Date and Time: ' + this.state.date.toString(),
+                                [
+                                    {
+                                        text: 'Cancel', 
+                                        onPress: () => this.resetForm(),
+                                        style: 'cancel'
+                                    },
+                                    {
+                                        text: 'OK',
+                                        onPress: () => {
+                                            this.presentLocalNotification(this.state.date);
+                                            this.resetForm();
+                                        }
+                                    }
+                                ],
+                                {cancelable: false }
+                            );
+                        }}
                         accessibilityLabel='Learn more about this purple button'/>
                 </View>
-                <Modal 
+                {/* <Modal 
                     animationType={'slide'}
                     transparent={false}
                     visible={this.state.showModal}
@@ -131,7 +186,8 @@ class Reservation extends Component {
                             title="Close" 
                             />
                     </View>
-                </Modal>
+                </Modal> */}
+                </Animatable.View>
             </ScrollView>
         );
     }
